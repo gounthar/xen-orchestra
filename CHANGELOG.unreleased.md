@@ -51,6 +51,7 @@
 - [SR] Storage repositories can now be deleted from the Pool/Host Storage tab (PR [#9853](https://github.com/vatesfr/xen-orchestra/pull/9853))
 - [SR] Storage repositories can now be disconnected from the Pool/Host Storage tab (PR [#9856](https://github.com/vatesfr/xen-orchestra/pull/9856))
 - [REST API/RBAC] Add a built-in **Network administrator** role template: manage networks and VIFs, read and update PIFs (PR [#9952](https://github.com/vatesfr/xen-orchestra/pull/9952))
+- [sdn-controller] : added patch routes for both vif and network traffic rules ( [PR #9936](https://github.com/vatesfr/xen-orchestra/pull/9936) )
 
 ### Bug fixes
 
@@ -100,7 +101,6 @@
 - xo-server minor
 - xo-server-ipmi-sensors patch
 - xo-server-netbox minor
-- xo-server-sdn-controller patch
+- xo-server-sdn-controller minor
 - xo-web patch
-
 <!--packages-end-->
