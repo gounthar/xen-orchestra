@@ -4,4 +4,7 @@ export default {
   delete: true,
   disconnect: true,
   read: true,
+  update: {
+    otherConfig: true,
+  },
 }
