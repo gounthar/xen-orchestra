@@ -3,12 +3,16 @@
     <UiCardTitle>
       <template v-if="nameParts">
         <VtsIcon name="fa:bars-progress" size="medium" />
-        <span class="task-name">
           <template v-for="(part, index) in nameParts" :key="index">
-            <UiLink v-if="part.to" size="small" :to="part.to">{{ part.text }}</UiLink>
-            <template v-else>{{ part.text }}</template>
+            <UiLink size="small" :to="part.to">{{ part.text }}</UiLink>
           </template>
-        </span>
+      </template>
+      <UiLink v-else-if="task.properties.name !== undefined" size="small" icon="fa:bars-progress">
+        {{ task.properties.name }}
+      </UiLink>
+      <template v-else>
+        <VtsIcon name="fa:bars-progress" size="medium" />
+        {{ task.id }}
       </template>
       <UiLink v-else-if="task.properties.name !== undefined" size="medium" icon="fa:bars-progress">
         {{ task.properties.name }}
@@ -100,6 +104,7 @@ const { task } = defineProps<{
 const { t, d } = useI18n()
 
 const { resolveTaskName } = useXoTaskNameResolver()
+
 const nameParts = computed(() => (task.properties.name ? resolveTaskName(task.properties.name) : undefined))
 
 const { user } = useXoUserResource({}, () => task.properties.userId)
@@ -141,6 +146,11 @@ const formattedEndDate = computed(() => {
 <style scoped lang="postcss">
 .card-container {
   gap: 1.6rem;
+  .title {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+  }
 
   .content {
     display: flex;
