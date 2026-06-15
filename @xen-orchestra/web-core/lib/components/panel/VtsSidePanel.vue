@@ -71,17 +71,24 @@ const { t } = useI18n()
 
 watch(
   [() => props.selected, () => panelStore.isLocked, () => uiStore.isSmall],
-  ([selected]) => {
+  ([selected, isLocked, isSmall], previousState) => {
+    const [, previousIsLocked] = previousState ?? []
+
+    if (!isSmall && previousIsLocked && !isLocked && !selected) {
+      panelStore.collapse()
+    }
+
     if (selected === undefined) {
       return
     }
+
     panelStore.syncWithSelection(selected)
   },
   { immediate: true }
 )
 
 function handleClose() {
-  if (panelStore.actsAsFloating) {
+  if (panelStore.syncsOpenStateWithSelection) {
     panelStore.collapse()
   }
 
@@ -92,41 +99,23 @@ function handleClose() {
 <style scoped lang="postcss">
 .vts-side-panel {
   --panel-vertical-offset: 16.5rem;
-  width: 40rem;
-  z-index: 1010;
-  transition:
-    transform 0.25s,
-    margin-right 0.25s;
+
+  width: var(--side-panel-width, 40rem);
+  transition: transform 0.25s;
 
   &:not(.mobile) {
     position: relative;
     top: 0;
     min-height: calc(100dvh - var(--panel-vertical-offset));
+    transform: translateX(v-bind('panelStore.cssHorizontalOffset'));
 
-    &.locked {
-      margin-right: calc(-1 * v-bind('panelStore.cssHorizontalOffset'));
-    }
-
-    &:not(.locked) {
-      position: fixed;
-      top: var(--panel-vertical-offset);
-      right: 0;
-      bottom: 0;
-      transform: translateX(v-bind('panelStore.cssHorizontalOffset'));
-      border-block-start: 0.1rem solid var(--color-neutral-border);
-      border-start-start-radius: 0.8rem;
-
-      :deep(.header) {
-        border-start-start-radius: 0.8rem;
-      }
-
-      :deep(> .content) {
-        overflow: auto;
-      }
+    :deep(> .content) {
+      overflow: auto;
     }
   }
 
   &.mobile {
+    z-index: 1010;
     position: fixed;
     width: 100dvw;
     height: 100dvh;

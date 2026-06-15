@@ -9,7 +9,7 @@ export const usePanelStore = defineStore('panel', () => {
   const isLocked = useLocalStorage('panel.locked', true)
 
   const cssHorizontalOffset = computed(() => (isExpanded.value ? 0 : '100%'))
-  const actsAsFloating = computed(() => uiStore.isSmall || !isLocked.value)
+  const syncsOpenStateWithSelection = computed(() => uiStore.isSmall || !isLocked.value)
 
   function expand() {
     isExpanded.value = true
@@ -20,7 +20,7 @@ export const usePanelStore = defineStore('panel', () => {
   }
 
   function syncWithSelection(hasSelection: boolean) {
-    if (!actsAsFloating.value) {
+    if (!syncsOpenStateWithSelection.value) {
       return
     }
     if (!hasSelection && isExpanded.value) {
@@ -41,7 +41,7 @@ export const usePanelStore = defineStore('panel', () => {
   return {
     isExpanded,
     isLocked,
-    actsAsFloating,
+    syncsOpenStateWithSelection,
     expand,
     collapse,
     toggleLock,
