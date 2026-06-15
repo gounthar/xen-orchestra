@@ -5,6 +5,6 @@ export default {
   disconnect: true,
   read: true,
   update: {
-    otherConfig: true,
+    other_config: true,
   },
 }
