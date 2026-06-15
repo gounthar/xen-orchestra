@@ -1,12 +1,12 @@
 <template>
   <UiCard class="card-container">
     <UiCardTitle>
-      <template v-if="nameParts">
+      <div v-if="nameParts" class="title">
         <VtsIcon name="fa:bars-progress" size="medium" />
-          <template v-for="(part, index) in nameParts" :key="index">
-            <UiLink size="small" :to="part.to">{{ part.text }}</UiLink>
-          </template>
-      </template>
+        <template v-for="(part, index) in nameParts" :key="index">
+          <UiLink size="small" :to="part.to">{{ part.text }}</UiLink>
+        </template>
+      </div>
       <UiLink v-else-if="task.properties.name !== undefined" size="small" icon="fa:bars-progress">
         {{ task.properties.name }}
       </UiLink>
@@ -14,10 +14,6 @@
         <VtsIcon name="fa:bars-progress" size="medium" />
         {{ task.id }}
       </template>
-      <UiLink v-else-if="task.properties.name !== undefined" size="medium" icon="fa:bars-progress">
-        {{ task.properties.name }}
-      </UiLink>
-      <template v-else>{{ task.id }}</template>
     </UiCardTitle>
     <div class="content">
       <VtsCardRowKeyValue>
