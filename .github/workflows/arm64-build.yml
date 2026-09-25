@@ -1,0 +1,69 @@
+---
+name: arm64 build probe
+# Fork-only probe: does XO build from sources on arm64, and which native
+# modules does it pull in? Mirrors the install/build steps of ci.yml.
+on:
+  push:
+    branches: [ci/arm64-build]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl qemu-utils python3-vmdkstream git \
+            libxml2-utils libfuse2 nbdkit open-iscsi
+
+      - name: Setup Node environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '>=22.12'
+          cache: 'yarn'
+
+      - name: Report platform
+        run: |
+          uname -a
+          node -p "process.platform + ' ' + process.arch + ' ' + process.version"
+          nproc
+
+      - name: Install project dependencies
+        run: /usr/bin/time -v yarn 2>&1 | tee install.log
+
+      - name: Build the project
+        run: /usr/bin/time -v yarn build 2>&1 | tee build.log
+
+      - name: Inventory native modules
+        if: always()
+        run: |
+          {
+            echo "## binding.gyp (compiled from source)"
+            find node_modules packages @xen-orchestra @vates -name binding.gyp \
+              -not -path '*/test/*' 2>/dev/null | sort
+            echo
+            echo "## .node binaries"
+            find node_modules packages @xen-orchestra @vates -name '*.node' \
+              2>/dev/null | sort
+            echo
+            echo "## fuse-native load test"
+            node -e "require('fuse-native'); console.log('fuse-native: loads')" \
+              2>&1 || true
+          } | tee native-inventory.txt
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.runner }}
+          path: |
+            install.log
+            build.log
+            native-inventory.txt
