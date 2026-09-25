@@ -78,9 +78,10 @@ jobs:
           done
           mount | grep fuse
           sudo ls -l "$work/mnt"
-          # FUSE view must be byte-identical to the source image
+          # FUSE view must be byte-identical to the source image; read it as
+          # root: a root FUSE mount without allow_other refuses other users
           a=$(sha256sum < "$work/disk.raw" | cut -d' ' -f1)
-          b=$(sudo sha256sum < "$work/mnt/vhd0" | cut -d' ' -f1)
+          b=$(sudo sha256sum "$work/mnt/vhd0" | cut -d' ' -f1)
           echo "raw=$a fuse=$b"
           test "$a" = "$b"
           # and the filesystem inside it must read back
