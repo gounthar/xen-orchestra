@@ -7,6 +7,13 @@ on:
     branches: [ci/arm64-build]
   workflow_dispatch:
 
+# An explicit `shell: bash` makes GitHub run steps with -eo pipefail, so a
+# failing command piped into tee fails the step instead of hiding behind
+# tee's exit status (the first run reported success with yarn failing).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     strategy:
