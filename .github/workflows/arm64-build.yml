@@ -4,7 +4,7 @@ name: arm64 build probe
 # modules does it pull in? Mirrors the install/build steps of ci.yml.
 on:
   push:
-    branches: [ci/arm64-build]
+    branches: [ci/arm64-build, ci/arm64-fuse-swap]
   workflow_dispatch:
 
 # An explicit `shell: bash` makes GitHub run steps with -eo pipefail, so a
@@ -28,7 +28,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y curl qemu-utils python3-vmdkstream git \
-            libxml2-utils libfuse2 nbdkit open-iscsi
+            libxml2-utils libfuse2 nbdkit open-iscsi \
+            libfuse-dev pkg-config
 
       - name: Setup Node environment
         uses: actions/setup-node@v4
@@ -62,6 +63,14 @@ jobs:
             echo
             echo "## fuse-native load test"
             node -e "require('fuse-native'); console.log('fuse-native: loads')" \
+              2>&1 || true
+            echo
+            echo "## fuse-native resolved package"
+            node -p "require('fuse-native/package.json').name + '@' + require('fuse-native/package.json').version" \
+              2>&1 || true
+            echo
+            echo "## @vates/fuse-vhd load test"
+            node -e "import('@vates/fuse-vhd').then(() => console.log('@vates/fuse-vhd: loads'))" \
               2>&1 || true
           } | tee native-inventory.txt
 
