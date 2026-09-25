@@ -49,6 +49,48 @@ jobs:
       - name: Build the project
         run: /usr/bin/time -v yarn build 2>&1 | tee build.log
 
+      - name: FUSE mount test (fuse-vhd, as file-level restore does)
+        run: |
+          set -x
+          sudo modprobe fuse || true
+          ls -l /dev/fuse
+          work=$(mktemp -d)
+          mkdir -p "$work/remote" "$work/mnt" "$work/ro"
+          # 64 MiB ext4 image with one known file
+          truncate -s 64M "$work/disk.raw"
+          mkfs.ext4 -q -F "$work/disk.raw"
+          sudo mount -o loop "$work/disk.raw" "$work/ro"
+          echo "hello from $(uname -m) at $(date -u +%FT%TZ)" \
+            | sudo tee "$work/ro/probe.txt"
+          sudo umount "$work/ro"
+          # dynamic VHD, exact size (no CHS rounding)
+          qemu-img convert -f raw -O vpc \
+            -o subformat=dynamic,force_size=on \
+            "$work/disk.raw" "$work/remote/disk.vhd"
+          qemu-img info "$work/remote/disk.vhd"
+          # mount through the same module xo-server uses, as root
+          sudo "$(command -v node)" @vates/fuse-vhd/cli.mjs \
+            "file://$work/remote" disk.vhd "$work/mnt" &
+          cli=$!
+          for i in $(seq 1 60); do
+            sudo test -e "$work/mnt/vhd0" && break
+            sleep 1
+          done
+          mount | grep fuse
+          sudo ls -l "$work/mnt"
+          # FUSE view must be byte-identical to the source image
+          a=$(sha256sum < "$work/disk.raw" | cut -d' ' -f1)
+          b=$(sudo sha256sum < "$work/mnt/vhd0" | cut -d' ' -f1)
+          echo "raw=$a fuse=$b"
+          test "$a" = "$b"
+          # and the filesystem inside it must read back
+          sudo mount -o ro,loop,norecovery "$work/mnt/vhd0" "$work/ro"
+          sudo cat "$work/ro/probe.txt"
+          sudo umount "$work/ro"
+          sudo kill -INT "$cli" || true
+          wait "$cli" || true
+          echo "FUSE mount test: PASS"
+
       - name: Inventory native modules
         if: always()
         run: |
