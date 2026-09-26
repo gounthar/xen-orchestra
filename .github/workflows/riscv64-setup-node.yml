@@ -1,0 +1,36 @@
+---
+name: riscv64 setup-node check
+# One question: does actions/setup-node resolve the Node already in the
+# RISE runner's tool cache, or does it try (and fail) to download one?
+on:
+  push:
+    branches: [ci/riscv64-setup-node]
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04-riscv
+    timeout-minutes: 20
+    steps:
+      - name: Before setup-node
+        run: |
+          which node || echo "node not on PATH"
+          ls /opt/hostedtoolcache/node/ || true
+
+      - name: setup-node 22
+        id: setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: After setup-node
+        run: |
+          which node
+          node -p "[process.arch, process.version].join(' ')"
+          echo "resolved: ${{ steps.setup.outputs.node-version }}"
+          sudo env "PATH=$PATH" node -v
+          sudo node -v || echo "sudo node: not on sudo's PATH"
