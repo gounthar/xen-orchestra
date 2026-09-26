@@ -60,19 +60,42 @@ jobs:
       - name: Install project dependencies
         id: install
         continue-on-error: true
+        # leveldb 1.20 (bundled by leveldown) has no AtomicPointer for
+        # riscv64; LEVELDB_ATOMIC_PRESENT selects its std::atomic fallback.
+        env:
+          CXXFLAGS: -DLEVELDB_ATOMIC_PRESENT
         run: /usr/bin/time -v yarn 2>&1 | tee install.log
+
+      - name: Link the tree anyway if install failed
+        if: steps.install.outcome == 'failure'
+        run: yarn --ignore-scripts 2>&1 | tail -5
 
       - name: Full build (turbo)
         id: build
         continue-on-error: true
         run: /usr/bin/time -v yarn build 2>&1 | tee build.log
 
-      - name: xo-server alone, without turbo
+      - name: xo-server and its workspace deps, without turbo
         id: server
         continue-on-error: true
         run: |
-          /usr/bin/time -v yarn --cwd packages/xo-server run build 2>&1 \
-            | tee server-build.log
+          /usr/bin/time -v node .github/scripts/build-deps.mjs \
+            xo-server @vates/fuse-vhd 2>&1 | tee server-build.log
+          grep '^BUILD' server-build.log || true
+
+      - name: xo-web (XO 5 UI)
+        id: xo5
+        continue-on-error: true
+        run: |
+          /usr/bin/time -v node .github/scripts/build-deps.mjs xo-web \
+            2>&1 | tee xo5-build.log
+
+      - name: '@xen-orchestra/web (XO 6 UI, vite)'
+        id: xo6
+        continue-on-error: true
+        run: |
+          /usr/bin/time -v node .github/scripts/build-deps.mjs \
+            @xen-orchestra/web 2>&1 | tee xo6-build.log
 
       - name: FUSE mount test (report only)
         id: fuse
@@ -114,6 +137,8 @@ jobs:
             echo "install=${{ steps.install.outcome }}"
             echo "build=${{ steps.build.outcome }}"
             echo "server=${{ steps.server.outcome }}"
+            echo "xo5=${{ steps.xo5.outcome }}"
+            echo "xo6=${{ steps.xo6.outcome }}"
             echo "fuse=${{ steps.fuse.outcome }}"
             echo
             echo "## binding.gyp (compiled from source)"
@@ -132,9 +157,9 @@ jobs:
             echo
             echo "## known suspects"
             for m in turbo rolldown lightningcss esbuild @swc/core rollup \
-                     sass-embedded fuse-native; do
+                     sass-embedded fuse-native leveldown argon2; do
               printf '%s: ' "$m"
-              node -e "require('$m'); console.log('loads')" 2>&1 \
+              { node -e "require('$m'); console.log('loads')" 2>&1 || true; } \
                 | tail -1 | cut -c1-200
             done
           } | tee native-inventory.txt
@@ -148,4 +173,6 @@ jobs:
             install.log
             build.log
             server-build.log
+            xo5-build.log
+            xo6-build.log
             native-inventory.txt
