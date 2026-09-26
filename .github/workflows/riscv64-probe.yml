@@ -19,6 +19,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Put the preinstalled Node 22 on PATH
+        run: |
+          # The image preinstalls Node but does not put it on PATH.
+          ls -d /opt/hostedtoolcache/node/*/* /usr/local/lib/nodejs/* \
+            /opt/node* 2>/dev/null || true
+          bin=$(ls -d /opt/hostedtoolcache/node/22.*/*/bin 2>/dev/null \
+            | sort -V | tail -1)
+          if [ -z "$bin" ]; then
+            bin=$(dirname "$(find / -xdev -path '*node*22*' -name node \
+              -type f -perm -u+x 2>/dev/null | head -1)")
+          fi
+          echo "node bin: $bin"
+          test -x "$bin/node"
+          echo "$bin" >> "$GITHUB_PATH"
+
       - name: Report platform and toolchain
         run: |
           uname -a
