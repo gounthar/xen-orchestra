@@ -12,6 +12,10 @@ defaults:
   run:
     shell: bash
 
+env:
+  BUILT_LIST: ${{ github.workspace }}/.built-workspaces
+  PREDICTABLE_SHIM: ${{ github.workspace }}/.predictable-shim
+
 jobs:
   probe:
     runs-on: ubuntu-24.04-riscv
@@ -70,6 +74,15 @@ jobs:
         if: steps.install.outcome == 'failure'
         run: yarn --ignore-scripts 2>&1 | tail -5
 
+      - name: Create the node --predictable shim
+        run: |
+          mkdir -p "$PREDICTABLE_SHIM"
+          real=$(command -v node)
+          printf '#!/bin/sh\nexec %s --predictable "$@"\n' "$real" \
+            > "$PREDICTABLE_SHIM/node"
+          chmod +x "$PREDICTABLE_SHIM/node"
+          "$PREDICTABLE_SHIM/node" -p "'shim ok ' + process.version"
+
       - name: Full build (turbo)
         id: build
         continue-on-error: true
@@ -96,6 +109,24 @@ jobs:
         run: |
           /usr/bin/time -v node .github/scripts/build-deps.mjs \
             @xen-orchestra/web 2>&1 | tee xo6-build.log
+
+      - name: XO 6 UI again, with rolldown's WASI binding
+        id: xo6wasi
+        continue-on-error: true
+        env:
+          NAPI_RS_FORCE_WASI: 1
+        run: |
+          # rolldown has no linux-riscv64-gnu binding; its wasm32-wasi one
+          # is not installed because of its cpu field, so add it by hand.
+          ver=$(node -p "require('rolldown/package.json').version")
+          tmp=$(mktemp -d)
+          npm install --prefix "$tmp" --no-save --force --no-audit \
+            --no-fund "@rolldown/binding-wasm32-wasi@$ver"
+          cp -rn "$tmp/node_modules/." node_modules/
+          ls node_modules/@rolldown/
+          sed -i '/@xen-orchestra\/web$/d' "$BUILT_LIST" || true
+          /usr/bin/time -v node .github/scripts/build-deps.mjs \
+            @xen-orchestra/web 2>&1 | tee xo6-wasi-build.log
 
       - name: FUSE mount test (report only)
         id: fuse
@@ -139,6 +170,7 @@ jobs:
             echo "server=${{ steps.server.outcome }}"
             echo "xo5=${{ steps.xo5.outcome }}"
             echo "xo6=${{ steps.xo6.outcome }}"
+            echo "xo6wasi=${{ steps.xo6wasi.outcome }}"
             echo "fuse=${{ steps.fuse.outcome }}"
             echo
             echo "## binding.gyp (compiled from source)"
@@ -160,7 +192,7 @@ jobs:
                      sass-embedded fuse-native leveldown argon2; do
               printf '%s: ' "$m"
               { node -e "require('$m'); console.log('loads')" 2>&1 || true; } \
-                | tail -1 | cut -c1-200
+                | grep -m1 -E "^(loads|Error|.*Cannot find)" | cut -c1-200
             done
           } | tee native-inventory.txt
 
@@ -175,4 +207,5 @@ jobs:
             server-build.log
             xo5-build.log
             xo6-build.log
+            xo6-wasi-build.log
             native-inventory.txt
