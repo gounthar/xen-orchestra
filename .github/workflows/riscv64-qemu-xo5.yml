@@ -1,0 +1,41 @@
+---
+name: XO 5 riscv64 (QEMU)
+# Fork-only. xo-web (XO 5) crashes V8 when built natively on riscv64
+# hardware (BPI-F3 and the RISE runners), but built under QEMU user-mode on
+# 2026-09-26. This job builds it on an x86 runner through QEMU with riscv64
+# Node, and keeps the bundle as an artifact.
+on:
+  push:
+    branches: [ci/riscv64-qemu-xo5]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xo5-riscv64-qemu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: docker/setup-qemu-action@v4.4.0
+        with:
+          platforms: riscv64
+
+      - name: Build xo-web in a riscv64 container
+        run: |
+          docker run --rm --platform linux/riscv64 \
+            -v "$GITHUB_WORKSPACE:/xo" -w /xo ubuntu:24.04 \
+            bash .github/scripts/qemu-riscv64-xo5.sh
+
+      - name: Upload xo-web bundle and logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: xo-web-riscv64-qemu
+          path: |
+            install.log
+            xo5-build.log
+            packages/xo-web/dist
+          if-no-files-found: warn
