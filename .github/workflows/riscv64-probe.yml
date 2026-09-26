@@ -1,0 +1,136 @@
+---
+name: riscv64 build probe
+# Fork-only probe: how far does XO from sources get on riscv64, and which
+# native modules have no riscv64 binary? Every step reports instead of
+# failing, so one run maps all the blockers rather than stopping at the first.
+on:
+  push:
+    branches: [ci/riscv64-probe]
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04-riscv
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report platform and toolchain
+        run: |
+          uname -a
+          nproc
+          free -h
+          cat /etc/os-release | head -3
+          which -a node || true
+          node -p "[process.platform, process.arch, process.version].join(' ')"
+          gcc --version | head -1
+          python3 --version
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-utils libfuse2t64 libfuse-dev \
+            pkg-config file time
+
+      - name: Enable yarn 1.22.22
+        run: |
+          sudo corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn --version
+
+      - name: Install project dependencies
+        id: install
+        continue-on-error: true
+        run: /usr/bin/time -v yarn 2>&1 | tee install.log
+
+      - name: Full build (turbo)
+        id: build
+        continue-on-error: true
+        run: /usr/bin/time -v yarn build 2>&1 | tee build.log
+
+      - name: xo-server alone, without turbo
+        id: server
+        continue-on-error: true
+        run: |
+          /usr/bin/time -v yarn --cwd packages/xo-server run build 2>&1 \
+            | tee server-build.log
+
+      - name: FUSE mount test (report only)
+        id: fuse
+        continue-on-error: true
+        run: |
+          set -x
+          sudo modprobe fuse || echo "modprobe fuse failed"
+          ls -l /dev/fuse
+          work=$(mktemp -d)
+          mkdir -p "$work/remote" "$work/mnt" "$work/ro"
+          truncate -s 64M "$work/disk.raw"
+          mkfs.ext4 -q -F "$work/disk.raw"
+          sudo mount -o loop "$work/disk.raw" "$work/ro"
+          echo "hello from $(uname -m)" | sudo tee "$work/ro/probe.txt"
+          sudo umount "$work/ro"
+          qemu-img convert -f raw -O vpc \
+            -o subformat=dynamic,force_size=on \
+            "$work/disk.raw" "$work/remote/disk.vhd"
+          sudo "$(command -v node)" @vates/fuse-vhd/cli.mjs \
+            "file://$work/remote" disk.vhd "$work/mnt" &
+          cli=$!
+          for i in $(seq 1 60); do
+            sudo test -e "$work/mnt/vhd0" && break
+            sleep 1
+          done
+          a=$(sha256sum < "$work/disk.raw" | cut -d' ' -f1)
+          b=$(sudo sha256sum "$work/mnt/vhd0" | cut -d' ' -f1)
+          echo "raw=$a fuse=$b"
+          test "$a" = "$b"
+          sudo kill -INT "$cli" || true
+          wait "$cli" || true
+          echo "FUSE mount test: PASS"
+
+      - name: Inventory native modules and missing riscv64 binaries
+        if: always()
+        run: |
+          {
+            echo "## step outcomes"
+            echo "install=${{ steps.install.outcome }}"
+            echo "build=${{ steps.build.outcome }}"
+            echo "server=${{ steps.server.outcome }}"
+            echo "fuse=${{ steps.fuse.outcome }}"
+            echo
+            echo "## binding.gyp (compiled from source)"
+            find node_modules packages @xen-orchestra @vates -name binding.gyp \
+              -not -path '*/test/*' 2>/dev/null | sort
+            echo
+            echo "## .node binaries and their architecture"
+            find node_modules packages @xen-orchestra @vates -name '*.node' \
+              2>/dev/null | sort | while read -r f; do
+                echo "$f: $(file -bL "$f" | cut -d, -f1-2)"
+              done
+            echo
+            echo "## platform packages installed (linux-*)"
+            find node_modules -maxdepth 2 -type d -name '*linux*' 2>/dev/null \
+              | sort
+            echo
+            echo "## known suspects"
+            for m in turbo rolldown lightningcss esbuild @swc/core rollup \
+                     sass-embedded fuse-native; do
+              printf '%s: ' "$m"
+              node -e "require('$m'); console.log('loads')" 2>&1 \
+                | tail -1 | cut -c1-200
+            done
+          } | tee native-inventory.txt
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-riscv64
+          path: |
+            install.log
+            build.log
+            server-build.log
+            native-inventory.txt
