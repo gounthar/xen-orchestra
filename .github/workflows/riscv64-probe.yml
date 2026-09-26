@@ -53,7 +53,7 @@ jobs:
 
       - name: Enable yarn 1.22.22
         run: |
-          sudo corepack enable
+          sudo env "PATH=$PATH" corepack enable
           corepack prepare yarn@1.22.22 --activate
           yarn --version
 
