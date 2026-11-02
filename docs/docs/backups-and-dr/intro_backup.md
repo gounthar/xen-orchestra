@@ -21,7 +21,7 @@ New to backups in XO? Start with these two:
 - **[Incremental backups](./backup-types/incremental_backups.md)**: after an initial full, only the changed blocks are sent. Fast, compact, deduplicable.
 - **[Full replication](./backup-types/full_replication.md)** (formerly Disaster Recovery, DR): a ready-to-boot copy of your VMs, kept up to date on another host or SR.
 - **[Incremental replication](./backup-types/incremental_replication.md)** (formerly Continuous Replication, CR): the same standby copy, sending only the deltas.
-- **[Mirror backups](./backup-types/mirror_backup.md)**: replicate a whole backup repository to another one, the key to [3-2-1 strategies](backup_howto.md#long-term-retention-strategy).
+- **[Mirror backups](./backup-types/mirror_backup.md)**: replicate a whole backup repository to another one, the key to [3-2-1 strategies](backup_howto.md#offsite-copies-3-2-1).
 - **[Metadata backup](./backup-types/metadata_backup.md)**: the XO configuration and pool metadata themselves, so the orchestrator is never your single point of failure.
 
 :::tip

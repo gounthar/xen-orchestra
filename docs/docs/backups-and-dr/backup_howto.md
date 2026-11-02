@@ -126,7 +126,7 @@ The same standby copy, kept up to date by sending only the deltas.
 
 Replicates an existing backup repository to another one, possibly with different retention, encryption or compression.
 
-- **Pros**: the natural building block of a [3-2-1 strategy](#long-term-retention-strategy); the second copy can live on slower, cheaper storage.
+- **Pros**: the natural building block of a [3-2-1 strategy](#offsite-copies-3-2-1); the second copy can live on slower, cheaper storage.
 - **Watch out**: one job mirrors either full or incremental backups, not both: two jobs if your source repository holds both.
 - **First steps**: set up a dedicated destination repository, then test a restore from the mirror itself.
 
@@ -199,6 +199,19 @@ For compliance or archival needs, you rarely want *every* daily backup kept for 
 :::warning
 To prevent backup duplication, do not mix long-term retention with multiple schedules.
 :::
+
+
+## Offsite copies: the 3-2-1 rule {#offsite-copies-3-2-1}
+
+A common rule of thumb for backups: keep **3** copies of your data, on **2** different kinds of storage, with **1** of them offsite. In Xen Orchestra:
+
+1. The running VM is the first copy.
+2. A backup job writes the second copy to a backup repository, for example an NFS share on site.
+3. A [mirror backup](./backup-types/mirror_backup.md) copies that repository to a third one somewhere else, for example S3-compatible object storage. Each repository applies its own retention, so the offsite copy can keep more restore points on cheaper storage.
+
+[Distributed backups](./scale-and-security/distributed_backups.md) do not give you extra copies: each VM's backup lives on only one target.
+
+If the offsite repository must be immutable, read [S3 Object Lock](./scale-and-security/object-lock.md) before choosing the backup mode: it recommends full backups, or incremental backups with a full backup interval of `1`.
 
 
 ## Putting it all together
